@@ -1,8 +1,8 @@
 import utils
 
 class Agent:
-    
-    def __init__(self, actions):
+    def __init__(self, actions, two_sided = False): 
+        self.two_sided = two_sided
         self._actions = actions
         self._train = True
         self._x_bins = utils.X_BINS
@@ -13,9 +13,20 @@ class Agent:
         self._num_actions = utils.NUM_ACTIONS
         # Create the Q Table to work with
         self.Q = utils.create_q_table()
-
+    ###
+    # a state has the following:
+    # self.ball_x,
+    # self.ball_y,
+    # self.velocity_x,
+    # self.velocity_y,
+    # self.paddle_y,
+    # self.opponent_y,
+    # done = game over
+    # won = flag, true is you won
+    # bounces, how many times the ball has bounced from your paddle
+    ###
     def act(self, state, bounces, done, won):
-         #TODO - fill out this function
+         # TODO - fill out this function
         return self._actions[0]
 
     def train(self):
