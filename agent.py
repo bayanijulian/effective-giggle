@@ -18,10 +18,10 @@ class Agent:
         self.Q = utils.create_q_table()
         # Q-Learning with TD constants
         self.learning_rate = 1.0
-        self.gamma = 0.9 # discounted factor, how much to weight future rewards hold
+        self.gamma = .8 # discounted factor, how much to weight future rewards hold
         self.min_tries = 5 # tries an action at least this many times for each state before repeating
         self.max_reward = 1 # max reward for any given state
-        self.decay_factor = 2
+        self.decay_factor = 10
         # book keeping
         self.current_bounces = 0
         self.current_state = None
@@ -52,8 +52,9 @@ class Agent:
             # next state
             ball_x2, ball_y2, velocity_x2, velocity_y2, paddle_y2 = self.get_discrete_state(next_state)
 
-            # increment count of the current state seen by 1
+            
             index = (ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1, self.current_action)
+            # increment count of the current state seen by 1
             self.state_action_pair_counts[index] = self.state_action_pair_counts.setdefault(index, 0) + 1
 
             #Q(s,a)
@@ -73,14 +74,27 @@ class Agent:
             q_updated = q_current + (alpha * (reward - q_current + q_next_max))
             self.Q[ball_x1][ball_y1][velocity_x1][velocity_y1][paddle_y1][self.current_action] = q_updated
 
-            next_actions = self.Q[ball_x2][ball_y2][velocity_x2][velocity_y2][paddle_y2]
-            # exploration
-            exploration =  self.calculate_exploration(next_actions)
-            best_action = np.argmax(exploration)
-            # update next state and next action
-            self.current_action = best_action
+            
+            # update next state
             self.current_state = (ball_x2, ball_y2, velocity_x2, velocity_y2, paddle_y2)
+            
+           
+            # # actions with exploration
+            # if np.random.uniform(0, 1) < 0.01: # will randomly explore 5 percent of the time
+            #     action_index = np.random.choice(range(len(self._actions)))
+            # else: # explore using Boltzmann Technique
+            #     next_actions = self.Q[ball_x2][ball_y2][velocity_x2][velocity_y2][paddle_y2]
+            #     next_actions_exp = np.exp(next_actions)
+            #     probs = next_actions_exp / np.sum(next_actions_exp)
+            #     action_index = np.random.choice(range(len(self._actions)), p=probs)
 
+            next_actions = self.Q[ball_x2][ball_y2][velocity_x2][velocity_y2][paddle_y2]
+            exploration =  self.calculate_exploration(next_actions)
+
+            best_action = np.argmax(exploration)
+            self.current_action = best_action
+            #self.current_action = action_index
+            
             return self._actions[best_action]
         else: # evaluation
             ball_x2, ball_y2, velocity_x2, velocity_y2, paddle_y2 = self.get_discrete_state(next_state)
@@ -149,9 +163,9 @@ class Agent:
         return 0
     
     def calculate_exploration(self, next_actions):
-        ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1 = self.current_state
+        ball_x, ball_y, velocity_x, velocity_y, paddle_y = self.current_state
         for i in range(len(self._actions)):
-            index = (ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1, i)
+            index = (ball_x, ball_y, velocity_x, velocity_y, paddle_y, i)
             pair_count = self.state_action_pair_counts.setdefault(index, 0)
             if pair_count < self.min_tries:
                 next_actions[i] = self.max_reward
