@@ -18,10 +18,10 @@ class Agent:
         self.Q = utils.create_q_table()
         # Q-Learning with TD constants
         self.learning_rate = 1.0
-        self.gamma = .99 # discounted factor, how much to weight future rewards hold
+        self.gamma = .9 # discounted factor, how much to weight future rewards hold
         self.min_tries = 3 # tries an action at least this many times for each state before repeating
-        self.max_reward = 10 # max reward for any given state
-        self.decay_factor = 10
+        self.max_reward = 20 # max reward for any given state
+        self.decay_factor = 15
         # book keeping
         self.current_bounces = 0
         self.current_state = None
@@ -152,6 +152,8 @@ class Agent:
         return ball_x, ball_y, velocity_x, velocity_y, paddle_y
         
     def get_reward(self, bounces, done, won):
+        if self.two_sided:
+            return self.alternate_reward(bounces, done, won)
         # checks if a bounce was made
         if bounces > self.current_bounces:
             self.current_bounces += 1
@@ -162,7 +164,21 @@ class Agent:
             self.current_bounces = 0
             return -10
         return 0
-    
+    def alternate_reward(self, bounces, done, won):
+        # checks if a bounce was made
+        if bounces > self.current_bounces:
+            self.current_bounces += 1
+            return 10
+        # if the game is over, just for part 1
+        # part 2 can adjust the reward by checking if won
+        if done and won:
+            self.current_bounces = 0
+            return 20
+        elif done and not won:
+            self.current_bounces = 0
+            return -35
+        return 0
+
     def calculate_exploration(self, next_actions):
         ball_x, ball_y, velocity_x, velocity_y, paddle_y = self.current_state
         for i in range(len(self._actions)):
