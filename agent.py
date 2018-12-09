@@ -19,8 +19,9 @@ class Agent:
         # Q-Learning with TD constants
         self.learning_rate = 1.0
         self.gamma = 0.9 # discounted factor, how much to weight future rewards hold
-        self.min_tries = 0 # tries an action at least this many times for each state before repeating
+        self.min_tries = 5 # tries an action at least this many times for each state before repeating
         self.max_reward = 1 # max reward for any given state
+        self.decay_factor = 2
         # book keeping
         self.current_bounces = 0
         self.current_state = None
@@ -39,40 +40,53 @@ class Agent:
     # bounces, how many times the ball has bounced from your paddle
     
     def act(self, next_state, bounces, done, won):
-        # if the program just began, it will choose a random action
+        # if the program just began, it will choose to remain still
         if self.current_state is None:
             self.current_state = self.get_discrete_state(next_state)
-            self.current_action = np.random.choice(self._actions)
-            return self.current_action
+            self.current_action = 0
+            return self._actions[self.current_action]
 
-        # current state 
-        ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1 = self.current_state
-        #Q(s,a)
-        q_current = self.Q[ball_x1][ball_y1][velocity_x1][velocity_y1][paddle_y1][self.current_action]
+        if self.train:
+            # current state 
+            ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1 = self.current_state
+            # next state
+            ball_x2, ball_y2, velocity_x2, velocity_y2, paddle_y2 = self.get_discrete_state(next_state)
 
-        # next state
-        ball_x2, ball_y2, velocity_x2, velocity_y2, paddle_y2 = self.get_discrete_state(next_state)
-        # γmaxa′Q(s′,a′)
-        q_next_max = self.gamma * np.max(self.Q[ball_x2][ball_y2][velocity_x2][velocity_y2][paddle_y2])
+            # increment count of the current state seen by 1
+            index = (ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1, self.current_action)
+            self.state_action_pair_counts[index] = self.state_action_pair_counts.setdefault(index, 0) + 1
 
-        # the reward seen from commanding an action, a, from state s.
-        reward = self.get_reward(bounces, done, won)
+            #Q(s,a)
+            q_current = self.Q[ball_x1][ball_y1][velocity_x1][velocity_y1][paddle_y1][self.current_action]
 
-        # increment count of the current state seen by 1
-        index = (ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1, self.current_action)
-        self.state_action_pair_counts[index] = self.state_action_pair_counts.setdefault(index, 0) + 1
+            # a′Q(s′,a′)
+            q_next = self.Q[ball_x2][ball_y2][velocity_x2][velocity_y2][paddle_y2]
+            # γmaxa′Q(s′,a′)
+            q_next_max = self.gamma * np.max(q_next)
+            
+            # the reward seen from commanding an action, a, from state s.
+            reward = self.get_reward(bounces, done, won)
 
-        # calculate learning rate with decay
-        alpha = self.learning_rate / (self.learning_rate + self.state_action_pair_counts[index])
-        # Q(s,a)=Q(s,a)+α[R(s)−Q(s,a)+γmaxa′Q(s′,a′)]
-        q_updated = q_current + (self.learning_rate * (reward - q_current + q_next_max))
-        self.Q[ball_x1][ball_y1][velocity_x1][velocity_y1][paddle_y1][self.current_action] = q_updated
+            # calculate learning rate with decay, as more states are seen, the smaller the learning rate is
+            alpha = self.learning_rate * (self.decay_factor / (self.decay_factor + self.state_action_pair_counts[index]))
+            # Q(s,a)=Q(s,a)+α[R(s)−Q(s,a)+γmaxa′Q(s′,a′)]
+            q_updated = q_current + (alpha * (reward - q_current + q_next_max))
+            self.Q[ball_x1][ball_y1][velocity_x1][velocity_y1][paddle_y1][self.current_action] = q_updated
 
-        # update next state and next action
-        self.current_action = np.argmax(self.Q[ball_x2][ball_y2][velocity_x2][velocity_y2][paddle_y2])
-        self.current_state = (ball_x2, ball_y2, velocity_x2, velocity_y2, paddle_y2)
+            next_actions = self.Q[ball_x2][ball_y2][velocity_x2][velocity_y2][paddle_y2]
+            # exploration
+            exploration =  self.calculate_exploration(next_actions)
+            best_action = np.argmax(exploration)
+            # update next state and next action
+            self.current_action = best_action
+            self.current_state = (ball_x2, ball_y2, velocity_x2, velocity_y2, paddle_y2)
 
-        return self.current_action - 1 # returns the index 0,1,2 -> -1 = -1,0,1
+            return self._actions[best_action]
+        else: # evaluation
+            ball_x2, ball_y2, velocity_x2, velocity_y2, paddle_y2 = self.get_discrete_state(next_state)
+            next_actions = self.Q[ball_x2][ball_y2][velocity_x2][velocity_y2][paddle_y2]
+            best_action = np.argmax(next_actions)
+            return self._actions[best_action]
 
     def train(self):
         self._train = True
@@ -133,10 +147,12 @@ class Agent:
             self.current_bounces = 0
             return -1
         return 0
-        
-
-
     
-
-
-
+    def calculate_exploration(self, next_actions):
+        ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1 = self.current_state
+        for i in range(len(self._actions)):
+            index = (ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1, i)
+            pair_count = self.state_action_pair_counts.setdefault(index, 0)
+            if pair_count < self.min_tries:
+                next_actions[i] = self.max_reward
+        return next_actions
