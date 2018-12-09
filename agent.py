@@ -18,9 +18,9 @@ class Agent:
         self.Q = utils.create_q_table()
         # Q-Learning with TD constants
         self.learning_rate = 1.0
-        self.gamma = .8 # discounted factor, how much to weight future rewards hold
-        self.min_tries = 5 # tries an action at least this many times for each state before repeating
-        self.max_reward = 1 # max reward for any given state
+        self.gamma = .99 # discounted factor, how much to weight future rewards hold
+        self.min_tries = 3 # tries an action at least this many times for each state before repeating
+        self.max_reward = 10 # max reward for any given state
         self.decay_factor = 10
         # book keeping
         self.current_bounces = 0
@@ -41,12 +41,12 @@ class Agent:
     
     def act(self, next_state, bounces, done, won):
         # if the program just began, it will choose to remain still
-        if self.current_state is None:
+        if self.current_state is None and self._train:
             self.current_state = self.get_discrete_state(next_state)
             self.current_action = 0
             return self._actions[self.current_action]
 
-        if self.train:
+        if self._train:
             # current state 
             ball_x1, ball_y1, velocity_x1, velocity_y1, paddle_y1 = self.current_state
             # next state
@@ -110,6 +110,7 @@ class Agent:
 
     def save_model(self,model_path):
         # At the end of training save the trained model
+        print("discount {}, decay {}, min_tries {}, max_reward {}".format(self.gamma, self.decay_factor, self.min_tries, self.max_reward))
         utils.save(model_path,self.Q)
 
     def load_model(self,model_path):
@@ -154,12 +155,12 @@ class Agent:
         # checks if a bounce was made
         if bounces > self.current_bounces:
             self.current_bounces += 1
-            return 1
+            return 5
         # if the game is over, just for part 1
         # part 2 can adjust the reward by checking if won
         if done:
             self.current_bounces = 0
-            return -1
+            return -10
         return 0
     
     def calculate_exploration(self, next_actions):
